@@ -1,6 +1,8 @@
+import html
 import logging
 from typing import Optional
 from telegram import Update
+from telegram.constants import ParseMode
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
@@ -28,7 +30,7 @@ logger = logging.getLogger(__name__)
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command. Register user and send welcome message."""
     user = update.effective_user
-    if not user:
+    if not user or not update.message:
         return
 
     # Register or update user in database
@@ -39,42 +41,42 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         morning_hour="08:00",
     )
 
-    first_name = user.first_name or "Amigo"
+    first_name = html.escape(user.first_name or "Amigo")
     welcome_text = (
-        f"🦉 *¡Hola, {first_name}! Bienvenido a HabitBot.*\n\n"
+        f"🦉 <b>¡Hola, {first_name}! Bienvenido a HabitBot.</b>\n\n"
         "Soy tu coach diario de hábitos al estilo Duolingo. Mi misión es ayudarte "
         "a construir disciplina paso a paso y mantener viva tu racha 🔥.\n\n"
-        "📋 *Comandos disponibles:*\n"
-        "• /add_habit <nombre> — Crea un nuevo hábito diario.\n"
-        "• /status — Mira tu progreso de hoy y marca tus hábitos.\n"
-        "• /list — Consulta y administra tu lista de hábitos.\n"
-        "• /help — Instrucciones y consejos sobre tus rachas.\n\n"
-        "💡 *¿Listo para empezar?*\n"
+        "📋 <b>Comandos disponibles:</b>\n"
+        "• <code>/add_habit &lt;nombre&gt;</code> — Crea un nuevo hábito diario.\n"
+        "• <code>/status</code> — Mira tu progreso de hoy y marca tus hábitos.\n"
+        "• <code>/list</code> — Consulta y administra tu lista de hábitos.\n"
+        "• <code>/help</code> — Instrucciones y consejos sobre tus rachas.\n\n"
+        "💡 <b>¿Listo para empezar?</b>\n"
         "Agrega tu primer hábito escribiendo:\n"
-        "`/add_habit Tomar 2L de agua`"
+        "<code>/add_habit Tomar 2L de agua</code>"
     )
 
-    await update.message.reply_text(welcome_text, parse_mode="Markdown")
+    await update.message.reply_text(welcome_text, parse_mode=ParseMode.HTML)
 
 
 async def add_habit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /add_habit command. Adds a habit with arguments or gives instructions."""
     user = update.effective_user
-    if not user:
+    if not user or not update.message:
         return
 
     if not context.args:
         instruction_text = (
-            "💡 *¿Cómo agregar un hábito?*\n\n"
+            "💡 <b>¿Cómo agregar un hábito?</b>\n\n"
             "Escribe el nombre del hábito después del comando.\n\n"
-            "*Ejemplos:*\n"
-            "• `/add_habit Tomar 2L de agua`\n"
-            "• `/add_habit Leer 15 min`\n"
-            "• `/add_habit Hacer 20 flexiones`\n"
-            "• `/add_habit Meditar 10 min`\n\n"
+            "<b>Ejemplos:</b>\n"
+            "• <code>/add_habit Tomar 2L de agua</code>\n"
+            "• <code>/add_habit Leer 15 min</code>\n"
+            "• <code>/add_habit Hacer 20 flexiones</code>\n"
+            "• <code>/add_habit Meditar 10 min</code>\n\n"
             "¡Elige algo simple para asegurar tu racha diaria! 🔥"
         )
-        await update.message.reply_text(instruction_text, parse_mode="Markdown")
+        await update.message.reply_text(instruction_text, parse_mode=ParseMode.HTML)
         return
 
     title = " ".join(context.args).strip()
@@ -90,31 +92,32 @@ async def add_habit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     habit_id = await create_habit(user.id, title, frequency="daily")
     logger.info(f"User {user.id} created habit #{habit_id}: '{title}'")
 
+    safe_title = html.escape(title)
     response_text = (
-        f"✅ *¡Hábito agregado con éxito!*\n\n"
-        f"📌 *{title}*\n\n"
+        "✅ <b>¡Hábito agregado con éxito!</b>\n\n"
+        f"📌 <b>{safe_title}</b>\n\n"
         "Usa /status para marcar tu avance de hoy y comenzar a sumar días en tu racha 🔥."
     )
-    await update.message.reply_text(response_text, parse_mode="Markdown")
+    await update.message.reply_text(response_text, parse_mode=ParseMode.HTML)
 
 
 async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /list command. Displays all registered habits with inline actions."""
     user = update.effective_user
-    if not user:
+    if not user or not update.message:
         return
 
     habits = await get_user_habits(user.id)
     text = format_habits_list(habits)
     keyboard = build_habits_list_keyboard(habits) if habits else None
 
-    await update.message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
+    await update.message.reply_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /status command. Displays today's status checklist with interactive buttons."""
     user = update.effective_user
-    if not user:
+    if not user or not update.message:
         return
 
     db_user = await get_user(user.id)
@@ -126,7 +129,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     text = format_status_message(habits, streak, today_str)
     keyboard = build_status_keyboard(habits) if habits else None
 
-    await update.message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
+    await update.message.reply_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
 
 async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -159,10 +162,9 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
         if all_completed and is_new_streak_day:
             alert_text = f"🎉 ¡Racha protegida! Llevas {streak} días consecutivos 🔥"
             await query.answer(alert_text, show_alert=True)
-            # Send motivational chat celebration
             congrats = get_congratulations_message(streak)
             if query.message:
-                await query.message.reply_text(congrats, parse_mode="Markdown")
+                await query.message.reply_text(congrats, parse_mode=ParseMode.HTML)
         else:
             toast = "Completado ✅" if new_status else "Desmarcado ⬜"
             await query.answer(toast)
@@ -179,7 +181,7 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             await query.edit_message_text(
                 text=new_text,
                 reply_markup=new_keyboard,
-                parse_mode="Markdown",
+                parse_mode=ParseMode.HTML,
             )
         except BadRequest as e:
             if "Message is not modified" not in str(e):
@@ -197,7 +199,7 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             await query.edit_message_text(
                 text=text,
                 reply_markup=keyboard,
-                parse_mode="Markdown",
+                parse_mode=ParseMode.HTML,
             )
         except BadRequest as e:
             if "Message is not modified" not in str(e):
@@ -214,7 +216,7 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             await query.edit_message_text(
                 text=text,
                 reply_markup=keyboard,
-                parse_mode="Markdown",
+                parse_mode=ParseMode.HTML,
             )
         except BadRequest as e:
             if "Message is not modified" not in str(e):
@@ -242,7 +244,7 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             await query.edit_message_text(
                 text=text,
                 reply_markup=keyboard,
-                parse_mode="Markdown",
+                parse_mode=ParseMode.HTML,
             )
         except BadRequest as e:
             if "Message is not modified" not in str(e):
@@ -254,18 +256,21 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /help command."""
+    if not update.message:
+        return
+
     help_text = (
-        "🦉 *Guía de HabitBot: Coach de Hábitos*\n\n"
+        "🦉 <b>Guía de HabitBot: Coach de Hábitos</b>\n\n"
         "HabitBot se basa en la consistencia de pequeñas acciones diarias para generar grandes cambios.\n\n"
-        "🔥 *Reglas de la Racha (Duolingo Style):*\n"
-        "1. Completa *todos* tus hábitos registrados antes de la medianoche.\n"
+        "🔥 <b>Reglas de la Racha (Duolingo Style):</b>\n"
+        "1. Completa <b>todos</b> tus hábitos registrados antes de la medianoche.\n"
         "2. Al completar el último hábito, tu racha aumentará en +1 día.\n"
         "3. Si un día no completas tus hábitos, tu racha volverá a 0. ¡No dejes que se apague el fuego!\n\n"
-        "📌 *Lista de Comandos:*\n"
-        "• `/start` — Inicia o reinicia tu perfil.\n"
-        "• `/add_habit <nombre>` — Agrega un hábito diario.\n"
-        "• `/status` — Abre tu tablero diario interactivo con casillas de verificación.\n"
-        "• `/list` — Mira tus hábitos y elimina los que ya no necesites.\n"
-        "• `/help` — Muestra esta ayuda.\n"
+        "📌 <b>Lista de Comandos:</b>\n"
+        "• <code>/start</code> — Inicia o reinicia tu perfil.\n"
+        "• <code>/add_habit &lt;nombre&gt;</code> — Agrega un hábito diario.\n"
+        "• <code>/status</code> — Abre tu tablero diario interactivo con casillas de verificación.\n"
+        "• <code>/list</code> — Mira tus hábitos y elimina los que ya no necesites.\n"
+        "• <code>/help</code> — Muestra esta ayuda.\n"
     )
-    await update.message.reply_text(help_text, parse_mode="Markdown")
+    await update.message.reply_text(help_text, parse_mode=ParseMode.HTML)

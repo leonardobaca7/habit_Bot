@@ -1,4 +1,5 @@
-from typing import List, Dict, Any, Tuple
+import html
+from typing import List, Dict, Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from src.core.streaks import get_streak_emoji
 
@@ -8,13 +9,13 @@ def format_status_message(
     streak: int,
     date_str: str,
 ) -> str:
-    """Format the daily status report with checkboxes and streak counter."""
+    """Format the daily status report with checkboxes and streak counter in clean HTML."""
     if not habits:
         return (
-            "🌱 *Aún no tienes hábitos registrados.*\n\n"
+            "🌱 <b>Aún no tienes hábitos registrados.</b>\n\n"
             "Comienza agregando uno usando:\n"
-            "`/add_habit <nombre del hábito>`\n\n"
-            "Ejemplo: `/add_habit Tomar 2L de agua`"
+            "<code>/add_habit &lt;nombre del hábito&gt;</code>\n\n"
+            "Ejemplo: <code>/add_habit Tomar 2L de agua</code>"
         )
 
     completed_count = sum(1 for h in habits if h.get("completed"))
@@ -23,19 +24,20 @@ def format_status_message(
     emoji = get_streak_emoji(streak)
 
     lines = [
-        f"📅 *Tus Hábitos de Hoy* ({date_str})",
-        f"🔥 *Racha activa:* {streak} días {emoji}",
-        f"🎯 *Progreso:* {completed_count}/{total_count} ({pct}%)\n",
+        f"📅 <b>Tus Hábitos de Hoy</b> ({html.escape(date_str)})",
+        f"🔥 <b>Racha activa:</b> {streak} días {emoji}",
+        f"🎯 <b>Progreso:</b> {completed_count}/{total_count} ({pct}%)\n",
     ]
 
     for h in habits:
         check = "✅" if h.get("completed") else "⬜"
-        lines.append(f"[{check}] {h['title']}")
+        safe_title = html.escape(str(h.get("title", "")))
+        lines.append(f"[{check}] {safe_title}")
 
     if completed_count == total_count:
-        lines.append("\n🌟 *¡Increíble! Has completado todos tus hábitos de hoy.*")
+        lines.append("\n🌟 <b>¡Increíble! Has completado todos tus hábitos de hoy.</b>")
     else:
-        lines.append("\n👇 *Toca los botones para marcar o desmarcar:*")
+        lines.append("\n👇 <b>Toca los botones para marcar o desmarcar:</b>")
 
     return "\n".join(lines)
 
@@ -62,17 +64,18 @@ def build_status_keyboard(habits: List[Dict[str, Any]]) -> InlineKeyboardMarkup:
 
 
 def format_habits_list(habits: List[Dict[str, Any]]) -> str:
-    """Format overall habits list."""
+    """Format overall habits list in clean HTML."""
     if not habits:
         return (
-            "🌱 *No tienes hábitos activos.*\n\n"
-            "¡Crea el primero con `/add_habit <nombre>` para iniciar tu racha!"
+            "🌱 <b>No tienes hábitos activos.</b>\n\n"
+            "¡Crea el primero con <code>/add_habit &lt;nombre&gt;</code> para iniciar tu racha!"
         )
 
-    lines = [f"📋 *Tus Hábitos Registrados* ({len(habits)}):\n"]
+    lines = [f"📋 <b>Tus Hábitos Registrados</b> ({len(habits)}):\n"]
     for idx, h in enumerate(habits, start=1):
         freq = "Diario" if h.get("frequency") == "daily" else h.get("frequency", "Diario")
-        lines.append(f"{idx}. *{h['title']}* _({freq})_")
+        safe_title = html.escape(str(h.get("title", "")))
+        lines.append(f"{idx}. <b>{safe_title}</b> <i>({html.escape(str(freq))})</i>")
 
     lines.append("\n💡 Usa /status para revisar y marcar tus hábitos de hoy.")
     return "\n".join(lines)

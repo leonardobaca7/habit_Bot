@@ -1,3 +1,4 @@
+import html
 from datetime import datetime
 import zoneinfo
 from typing import Optional
@@ -29,20 +30,20 @@ def get_streak_emoji(streak: int) -> str:
 
 
 def get_congratulations_message(streak: int) -> str:
-    """Return celebratory message when completing all daily habits."""
+    """Return celebratory message formatted in HTML when completing all daily habits."""
     emoji = get_streak_emoji(streak)
     if streak == 1:
         return (
-            f"🎉 ¡Primer día completado! {emoji}\n\n"
-            "Has encendido tu racha. Mañana vuelve a la misma hora para mantenerla viva."
+            f"🎉 <b>¡Primer día completado! {emoji}</b>\n\n"
+            "Has encendido tu racha. Mañana vuelve para mantenerla viva."
         )
     elif streak in [3, 7, 14, 21, 30, 50, 100]:
         return (
-            f"🏆 ¡HITO ALCANZADO! {streak} DÍAS SEGUIDOS {emoji}\n\n"
-            f"¡Eres imparable! Tu constancia está creando hábitos de acero. ¡Sigue así!"
+            f"🏆 <b>¡HITO ALCANZADO! {streak} DÍAS SEGUIDOS {emoji}</b>\n\n"
+            "¡Eres imparable! Tu constancia está creando hábitos de acero. ¡Sigue así!"
         )
     else:
         return (
-            f"🎉 ¡Todos los hábitos de hoy completados! {emoji}\n\n"
-            f"Tu racha asciende a **{streak} días** consecutivos. ¡Duolingo estaría orgulloso de ti! 🦉🔥"
+            f"🎉 <b>¡Todos los hábitos de hoy completados! {emoji}</b>\n\n"
+            f"Tu racha asciende a <b>{streak} días</b> consecutivos. ¡Duolingo estaría orgulloso de ti! 🦉🔥"
         )
