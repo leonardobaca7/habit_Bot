@@ -44,19 +44,51 @@ async def create_habit(
     user_id: int,
     title: str,
     frequency: str = "daily",
+    time: Optional[str] = None,
     db_path: Optional[str] = None,
 ) -> int:
-    """Create a new habit for the specified user."""
+    """Create a new habit for the specified user with optional time."""
     async with get_db_connection(db_path) as db:
         cursor = await db.execute(
             """
-            INSERT INTO habits (user_id, title, frequency)
-            VALUES (?, ?, ?);
+            INSERT INTO habits (user_id, title, frequency, time)
+            VALUES (?, ?, ?, ?);
             """,
-            (user_id, title.strip(), frequency),
+            (user_id, title.strip(), frequency, time),
         )
         await db.commit()
         return cursor.lastrowid
+
+
+async def update_habit_time(
+    habit_id: int,
+    user_id: int,
+    new_time: str,
+    db_path: Optional[str] = None,
+) -> bool:
+    """Update scheduled time for a habit."""
+    async with get_db_connection(db_path) as db:
+        cursor = await db.execute(
+            "UPDATE habits SET time = ? WHERE id = ? AND user_id = ?;",
+            (new_time, habit_id, user_id),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+async def get_habit_by_id(
+    habit_id: int,
+    user_id: int,
+    db_path: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Fetch habit by ID and user ID."""
+    async with get_db_connection(db_path) as db:
+        async with db.execute(
+            "SELECT * FROM habits WHERE id = ? AND user_id = ?;",
+            (habit_id, user_id),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
 
 
 async def get_user_habits(

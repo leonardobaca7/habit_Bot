@@ -1,7 +1,7 @@
 import html
 import logging
 from typing import Optional
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
@@ -10,6 +10,8 @@ from src.database.queries import (
     add_or_update_user,
     get_user,
     create_habit,
+    update_habit_time,
+    get_habit_by_id,
     get_user_habits,
     delete_habit,
     get_today_habits_status,
@@ -22,8 +24,11 @@ from src.core.habits import (
     build_status_keyboard,
     format_habits_list,
     build_habits_list_keyboard,
+    get_main_reply_keyboard,
+    format_streak_card,
 )
 from src.scheduler.jobs import send_morning_notification, send_rescue_notification
+from src.services.ai_service import extract_habit_from_text, parse_habit_intent
 
 logger = logging.getLogger(__name__)
 
@@ -47,17 +52,21 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         f"🦉 <b>¡Hola, {first_name}! Bienvenido a HabitBot.</b>\n\n"
         "Soy tu coach diario de hábitos. Mi misión es ayudarte "
         "a construir disciplina paso a paso y mantener viva tu racha 🔥.\n\n"
-        "📋 <b>Comandos disponibles:</b>\n"
-        "• <code>/add_habit &lt;nombre&gt;</code> — Crea un nuevo hábito diario.\n"
-        "• <code>/status</code> — Mira tu progreso de hoy y marca tus hábitos.\n"
-        "• <code>/list</code> — Consulta y administra tu lista de hábitos.\n"
-        "• <code>/help</code> — Instrucciones y consejos sobre tus rachas.\n\n"
-        "💡 <b>¿Listo para empezar?</b>\n"
-        "Agrega tu primer hábito escribiendo:\n"
-        "<code>/add_habit Tomar 2L de agua</code>"
+        "💡 <b>¡Ya no dependes de comandos!</b>\n"
+        "Puedes usar los botones de acceso rápido que aparecen abajo o simplemente "
+        "<b>escribir en el chat lo que deseas hacer</b> (por ejemplo: <i>'Quiero leer 20 min'</i> o <i>'Tomar 2L de agua'</i>) "
+        "y mi Inteligencia Artificial lo registrará automáticamente. 🤖✨\n\n"
+        "🔘 <b>Botones principales:</b>\n"
+        "• <b>📋 Mis Hábitos de Hoy:</b> Tu tablero interactivo con casillas.\n"
+        "• <b>➕ Agregar Hábito:</b> Ideas y guía para crear nuevas metas.\n"
+        "• <b>🔥 Ver Racha:</b> Consulta tus días consecutivos y estadísticas."
     )
 
-    await update.message.reply_text(welcome_text, parse_mode=ParseMode.HTML)
+    await update.message.reply_text(
+        welcome_text,
+        reply_markup=get_main_reply_keyboard(),
+        parse_mode=ParseMode.HTML,
+    )
 
 
 async def add_habit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -251,6 +260,72 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             if "Message is not modified" not in str(e):
                 logger.error(f"Error updating message after delete: {e}")
 
+    # 5. Change Habit Time
+    elif data.startswith("change_time_"):
+        try:
+            habit_id = int(data.split("_")[2])
+        except (ValueError, IndexError):
+            await query.answer("Error al cambiar horario.")
+            return
+
+        habit = await get_habit_by_id(habit_id, user.id)
+        if not habit:
+            await query.answer("Hábito no encontrado.")
+            return
+
+        await query.answer()
+        safe_title = html.escape(habit["title"])
+        time_buttons = [
+            [
+                InlineKeyboardButton("🌅 07:00", callback_data=f"set_time_{habit_id}_07:00"),
+                InlineKeyboardButton("☀️ 08:00", callback_data=f"set_time_{habit_id}_08:00"),
+                InlineKeyboardButton("🌤 12:00", callback_data=f"set_time_{habit_id}_12:00"),
+            ],
+            [
+                InlineKeyboardButton("⛅ 16:00", callback_data=f"set_time_{habit_id}_16:00"),
+                InlineKeyboardButton("🌙 20:00", callback_data=f"set_time_{habit_id}_20:00"),
+                InlineKeyboardButton("🌙 22:00", callback_data=f"set_time_{habit_id}_22:00"),
+            ],
+            [
+                InlineKeyboardButton("🔙 Volver al Tablero", callback_data="status_refresh")
+            ]
+        ]
+        await query.edit_message_text(
+            text=f"⏰ <b>Selecciona el horario de recordatorio para:</b>\n📌 <b>{safe_title}</b>",
+            reply_markup=InlineKeyboardMarkup(time_buttons),
+            parse_mode=ParseMode.HTML,
+        )
+
+    # 6. Set Specific Habit Time
+    elif data.startswith("set_time_"):
+        try:
+            parts = data.split("_")
+            habit_id = int(parts[2])
+            new_time = parts[3]
+        except (ValueError, IndexError):
+            await query.answer("Error al actualizar la hora.")
+            return
+
+        await update_habit_time(habit_id, user.id, new_time)
+        habit = await get_habit_by_id(habit_id, user.id)
+        title = habit["title"] if habit else "Hábito"
+        await query.answer(f"¡Recordatorio fijado a las {new_time}! ⏰✅")
+
+        safe_title = html.escape(title)
+        back_keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📊 Ver Tablero de Hoy", callback_data="status_refresh")]
+        ])
+        await query.edit_message_text(
+            text=(
+                f"✅ <b>¡Horario configurado con éxito!</b>\n\n"
+                f"📌 <b>Hábito:</b> {safe_title}\n"
+                f"⏰ <b>Nuevo recordatorio:</b> {new_time}\n\n"
+                "Te enviaremos una notificación cuando llegue tu hora. 🔥"
+            ),
+            reply_markup=back_keyboard,
+            parse_mode=ParseMode.HTML,
+        )
+
     else:
         await query.answer()
 
@@ -314,4 +389,120 @@ async def test_rescue_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             "Para probar la alerta de rescate, asegúrate de tener al menos un hábito sin completar.",
             parse_mode=ParseMode.HTML,
         )
+
+
+async def process_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handle incoming text messages:
+    - Button clicks ('📋 Mis Hábitos de Hoy', '➕ Agregar Hábito', '🔥 Ver Racha')
+    - Natural language free-form text parsed strictly with Gemini NLP JSON parser.
+    """
+    user = update.effective_user
+    if not user or not update.message:
+        return
+
+    text = (update.message.text or "").strip()
+    if not text:
+        return
+
+    # Ensure user is registered
+    db_user = await add_or_update_user(user.id, user.username)
+
+    # 1. Button: "📋 Mis Hábitos de Hoy"
+    if text == "📋 Mis Hábitos de Hoy":
+        await status_command(update, context)
+        return
+
+    # 2. Button: "➕ Agregar Hábito"
+    if text == "➕ Agregar Hábito":
+        prompt_text = (
+            "✏️ <b>¿Qué nuevo hábito te gustaría construir?</b>\n\n"
+            "Simplemente escríbeme lo que tienes en mente con o sin hora. Por ejemplo:\n"
+            "• <i>Leer 20 min todas las noches a las 22:00</i>\n"
+            "• <i>Tomar 2L de agua</i>\n"
+            "• <i>Meditar 10 min a las 07:30</i>\n"
+            "• <i>Hacer 30 flexiones al despertar</i>\n\n"
+            "🤖 <b>Nuestra IA con Gemini</b> extraerá el título, frecuencia y hora automáticamente."
+        )
+        await update.message.reply_text(prompt_text, parse_mode=ParseMode.HTML)
+        return
+
+    # 3. Button: "🔥 Ver Racha"
+    if text == "🔥 Ver Racha":
+        tz = db_user.get("timezone", "UTC") if db_user else "UTC"
+        streak = db_user.get("streak_count", 0) if db_user else 0
+        last_date = db_user.get("last_completed_date") if db_user else None
+        today_str = get_user_today_str(tz)
+        habits = await get_today_habits_status(user.id, today_str)
+
+        card = format_streak_card(
+            username=user.first_name or user.username or "Campeón",
+            streak=streak,
+            last_completed_date=last_date or "Sin registro aún",
+            habits=habits,
+        )
+        keyboard = build_status_keyboard(habits) if habits else None
+        await update.message.reply_text(card, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+        return
+
+    # 4. Natural language habit intent analysis via Gemini API
+    await update.message.chat.send_action("typing")
+
+    intent = await parse_habit_intent(text)
+    if intent.get("es_habito") and intent.get("titulo"):
+        title = intent["titulo"]
+        if len(title) > 100:
+            title = title[:100]
+
+        frequency = intent.get("frecuencia", "diario")
+        time = intent.get("hora")
+        # Si hora es null, asigna la hora mañanera por defecto del usuario
+        if not time:
+            time = db_user.get("morning_hour", "08:00") or "08:00"
+
+        habit_id = await create_habit(user.id, title, frequency=frequency, time=time)
+        logger.info(f"AI registered habit #{habit_id} for user {user.id}: '{title}' at {time} ({frequency})")
+
+        safe_title = html.escape(title)
+        safe_time = html.escape(time)
+        safe_freq = html.escape(frequency)
+
+        confirm_text = (
+            "✅ <b>¡Hábito registrado!</b>\n\n"
+            f"📌 <b>Hábito:</b> {safe_title}\n"
+            f"⏰ <b>Horario:</b> {safe_time} ({safe_freq})\n\n"
+            "¿Deseas ajustar la hora?"
+        )
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✏️ Cambiar hora", callback_data=f"change_time_{habit_id}")],
+            [InlineKeyboardButton("📊 Ver Tablero de Hoy", callback_data="status_refresh")],
+        ])
+
+        await update.message.reply_text(
+            confirm_text,
+            reply_markup=keyboard,
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    # 5. Si es_habito es false: respuesta amigable con tono Duolingo
+    not_understood_text = (
+        "🦉 <i>¡Ups! No estoy seguro de si eso es un hábito.</i>\n\n"
+        "Prueba diciendo algo como:\n"
+        "• <i>\"Leer 20 minutos todas las noches a las 22:00\"</i>\n"
+        "• <i>\"Tomar 2L de agua\"</i>\n"
+        "• <i>\"Meditar 10 minutos a las 07:30\"</i>\n"
+        "• <i>\"Hacer 30 flexiones al despertar\"</i>\n\n"
+        "O usa los botones de abajo para navegar. 👇"
+    )
+    await update.message.reply_text(
+        not_understood_text,
+        reply_markup=get_main_reply_keyboard(),
+        parse_mode=ParseMode.HTML,
+    )
+
+
+# Alias for compatibility
+text_message_handler = process_text_message
+
 

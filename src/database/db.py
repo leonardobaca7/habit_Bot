@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS habits (
     user_id INTEGER NOT NULL,
     title TEXT NOT NULL,
     frequency TEXT DEFAULT 'daily',
+    time TEXT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
@@ -103,6 +104,13 @@ async def init_db(db_path: Optional[str] = None) -> None:
         await db.execute(CREATE_DAILY_LOGS_TABLE)
         await db.execute(CREATE_NOTIFICATION_LOGS_TABLE)
         await db.executescript(CREATE_INDEXES)
+
+        # Migration: ensure 'time' column exists in 'habits'
+        async with db.execute("PRAGMA table_info(habits);") as cursor:
+            cols = [row["name"] for row in await cursor.fetchall()]
+            if "time" not in cols:
+                await db.execute("ALTER TABLE habits ADD COLUMN time TEXT DEFAULT NULL;")
+
         await db.commit()
 
     logger.info("Database initialized successfully with all tables and indexes.")

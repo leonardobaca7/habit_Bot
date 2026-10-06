@@ -4,7 +4,7 @@ from datetime import datetime
 import zoneinfo
 from typing import Optional, List, Dict, Any
 
-from telegram import Bot
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.error import TelegramError
 from telegram.ext import Application, ContextTypes
@@ -12,6 +12,7 @@ from telegram.ext import Application, ContextTypes
 from src.database.queries import (
     get_all_users,
     get_user,
+    get_user_habits,
     get_today_habits_status,
     has_notification_been_sent,
     record_notification_sent,
@@ -133,10 +134,51 @@ async def send_rescue_notification(bot: Bot, user: Dict[str, Any], force: bool =
         return False
 
 
+async def send_habit_custom_notification(bot: Bot, user: Dict[str, Any], habit: Dict[str, Any]) -> bool:
+    """Send reminder for a specific habit when its custom hour arrives."""
+    user_id = user["id"]
+    tz = user.get("timezone", "UTC")
+    today_str = get_user_today_str(tz)
+    notif_key = f"habit_{habit['id']}"
+
+    if await has_notification_been_sent(user_id, today_str, notif_key):
+        return False
+
+    status_list = await get_today_habits_status(user_id, today_str)
+    for h in status_list:
+        if h["habit_id"] == habit["id"] and h.get("completed"):
+            return False
+
+    safe_title = html.escape(habit["title"])
+    message = (
+        f"⏰ <b>¡Momento de tu hábito!</b> 🎯\n\n"
+        f"📌 <b>{safe_title}</b>\n\n"
+        "Un pequeño paso hoy protege tu racha. ¡Hazlo ahora!"
+    )
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"✅ Marcar {habit['title'][:20]}", callback_data=f"toggle_{habit['id']}")],
+        [InlineKeyboardButton("📋 Ver Todos los Hábitos", callback_data="status_refresh")],
+    ])
+
+    try:
+        await bot.send_message(
+            chat_id=user_id,
+            text=message,
+            reply_markup=keyboard,
+            parse_mode=ParseMode.HTML,
+        )
+        await record_notification_sent(user_id, today_str, notif_key)
+        logger.info(f"Custom habit notification sent for habit {habit['id']} to user {user_id}")
+        return True
+    except TelegramError as e:
+        logger.error(f"Failed to send custom habit notification: {e}")
+        return False
+
+
 async def dispatch_scheduled_notifications(bot: Bot) -> None:
     """
     Periodic job to inspect users and dispatch morning & rescue notifications
-    at their respective configured hours.
+    at their respective configured hours, plus custom habit notifications.
     """
     try:
         users = await get_all_users()
@@ -159,6 +201,12 @@ async def dispatch_scheduled_notifications(bot: Bot) -> None:
             # 2. Check Rescue Hour (6.5 hours later)
             elif current_hm == rescue_hour:
                 await send_rescue_notification(bot, user, force=False)
+
+            # 3. Check Custom Habit Hours
+            habits = await get_user_habits(user["id"])
+            for h in habits:
+                if h.get("time") and h["time"] == current_hm:
+                    await send_habit_custom_notification(bot, user, h)
 
     except Exception as e:
         logger.error(f"Error in notification dispatcher: {e}", exc_info=True)

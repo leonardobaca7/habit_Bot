@@ -1,6 +1,6 @@
 import html
 from typing import List, Dict, Any
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from src.core.streaks import get_streak_emoji
 
 
@@ -94,3 +94,42 @@ def build_habits_list_keyboard(habits: List[Dict[str, Any]]) -> InlineKeyboardMa
         InlineKeyboardButton("📊 Ver Progreso de Hoy", callback_data="status_refresh")
     ])
     return InlineKeyboardMarkup(keyboard)
+
+
+def get_main_reply_keyboard() -> ReplyKeyboardMarkup:
+    """Return persistent reply keyboard with main action buttons."""
+    keyboard = [
+        [KeyboardButton("📋 Mis Hábitos de Hoy")],
+        [KeyboardButton("➕ Agregar Hábito"), KeyboardButton("🔥 Ver Racha")],
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True)
+
+
+def format_streak_card(
+    username: str,
+    streak: int,
+    last_completed_date: str,
+    habits: List[Dict[str, Any]],
+) -> str:
+    """Format a detailed streak dashboard card."""
+    emoji = get_streak_emoji(streak)
+    completed_count = sum(1 for h in habits if h.get("completed"))
+    total_count = len(habits)
+
+    lines = [
+        f"🔥 <b>Panel de Racha de {html.escape(username)}</b>\n",
+        f"🔥 <b>Racha Actual:</b> {streak} días {emoji}",
+        f"📅 <b>Último día completado:</b> {last_completed_date or 'Ninguno aún'}",
+        f"🎯 <b>Progreso de hoy:</b> {completed_count}/{total_count} hábitos completados\n",
+    ]
+
+    if total_count == 0:
+        lines.append("🌱 Agrega tu primer hábito con <b>➕ Agregar Hábito</b> para encender tu fuego.")
+    elif completed_count == total_count:
+        lines.append("🛡️ <b>¡Racha protegida hoy!</b> Mantén el ritmo mañana.")
+    else:
+        pending = total_count - completed_count
+        lines.append(f"⚠️ Te faltan <b>{pending} hábito(s)</b> para no perder tu racha hoy. ¡Vamos!")
+
+    return "\n".join(lines)
+

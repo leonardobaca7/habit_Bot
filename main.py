@@ -6,6 +6,8 @@ from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
+    MessageHandler,
+    filters,
 )
 
 from src.database.db import init_db
@@ -17,6 +19,7 @@ from src.bot.handlers import (
     help_command,
     test_morning_command,
     test_rescue_command,
+    text_message_handler,
     button_callback_handler,
 )
 from src.scheduler.jobs import setup_scheduler
@@ -66,6 +69,9 @@ def create_application() -> Application:
     app.add_handler(CommandHandler("test_morning", test_morning_command))
     app.add_handler(CommandHandler("test_rescue", test_rescue_command))
 
+    # Register Message Handler for Natural Language Habit Processing and Buttons
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_text_message))
+
     # Register Callback Query Handler for Interactive Buttons
     app.add_handler(CallbackQueryHandler(button_callback_handler))
 
@@ -77,7 +83,7 @@ def create_application() -> Application:
 
 def main() -> None:
     """Main entry point for HabitBot."""
-    logger.info("Starting HabitBot with Gemini AI & APScheduler...")
+    logger.info("Starting HabitBot with Gemini AI Natural Language & Reply Keyboard...")
     app = create_application()
     logger.info("HabitBot handlers and scheduler registered. Starting polling...")
     app.run_polling()
