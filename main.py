@@ -1,0 +1,82 @@
+import logging
+import os
+import sys
+from dotenv import load_dotenv
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+)
+
+from src.database.db import init_db
+from src.bot.handlers import (
+    start_command,
+    add_habit_command,
+    list_command,
+    status_command,
+    help_command,
+    button_callback_handler,
+)
+
+# Load environment variables from .env
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
+logger = logging.getLogger("habitbot")
+
+
+async def post_init(application: Application) -> None:
+    """Async callback triggered upon bot startup before polling begins."""
+    logger.info("Initializing SQLite database...")
+    await init_db()
+    logger.info("Database initialized successfully.")
+
+
+def create_application() -> Application:
+    """Build and configure the Telegram Bot Application."""
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not token or token.strip() == "":
+        logger.error(
+            "CRITICAL: TELEGRAM_BOT_TOKEN is missing or empty in .env! "
+            "Please add your bot token from @BotFather."
+        )
+        sys.exit(1)
+
+    # Initialize Application
+    app = (
+        Application.builder()
+        .token(token.strip())
+        .post_init(post_init)
+        .build()
+    )
+
+    # Register Command Handlers
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("add_habit", add_habit_command))
+    app.add_handler(CommandHandler("list", list_command))
+    app.add_handler(CommandHandler("status", status_command))
+    app.add_handler(CommandHandler("help", help_command))
+
+    # Register Callback Query Handler for Interactive Buttons
+    app.add_handler(CallbackQueryHandler(button_callback_handler))
+
+    return app
+
+
+def main() -> None:
+    """Main entry point for HabitBot."""
+    logger.info("Starting HabitBot (Duolingo Style Habit Coach)...")
+    app = create_application()
+    logger.info("HabitBot handlers registered. Starting polling...")
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("HabitBot stopped cleanly.")
