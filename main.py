@@ -19,6 +19,7 @@ from src.bot.handlers import (
     help_command,
     test_morning_command,
     test_rescue_command,
+    process_text_message,
     text_message_handler,
     button_callback_handler,
 )
