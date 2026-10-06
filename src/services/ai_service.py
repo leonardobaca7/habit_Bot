@@ -13,17 +13,17 @@ logger = logging.getLogger(__name__)
 
 # Fallback templates if Gemini API is temporarily unavailable
 FALLBACK_RESCUE_TEMPLATES = [
-    "🦉 ¡{name}! Tu racha de {streak} días está llorando en una esquina. ¿Vas a dejar morir el fuego por {habit}? ¡Entra y sálvala ya! 🔥",
-    "🦉 Toc, toc, {name}... Veo que tienes tiempo de ver notificaciones pero no de {habit}. Tu racha de {streak} días corre peligro ⏰⚡",
-    "🦉 ¿Sientes ese frío? Es tu racha de {streak} días desvaneciéndose en el abismo. Completa {habits} antes de que sea tarde. 👀🔥",
-    "🦉 {name}, tu racha de {streak} días te observa con decepción. 5 minutos bastan para no empezar desde cero mañana. ¡Hazlo! 💥",
+    "¡Hola, {name}! Sé que el día puede ser ajetreado, pero no olvides {habit}. ¡Aún estás a tiempo de mantener viva tu racha de {streak} días! 💪",
+    "¡Ey, {name}! Paso a darte un empujoncito amistoso: todavía tienes pendiente {habit}. Vienes con un gran ritmo de {streak} días, ¡vamos a cuidarlo!",
+    "¡Hola, {name}! Tómate unos minutos hoy para {habits}. Llevas {streak} días seguidos y vale la pena el esfuerzo. ¡Tú puedes!",
+    "{name}, un recordatorio amigable: completa {habit} antes de descansar para no perder tu racha de {streak} días. ¡Ánimo!",
 ]
 
 FALLBACK_COACH_REPLIES = [
-    "🦉 ¡Hola, {name}! Aquí estoy vigilando que mantengas viva esa racha. ¿Qué hábito vamos a conquistar hoy? 🔥",
-    "🦉 Menos charla y más acción, {name}. Recuerda que cada día que no completas tus hábitos, un búho llora. 👀",
-    "🦉 ¡Te tengo en la mira, {name}! Mantén la disciplina y tu racha será legendaria. Toca '📋 Mis Hábitos' para ver tu avance.",
-    "🦉 ¡Esa es la actitud! Recuerda que puedes decirme directamente tus nuevos hábitos (ej: 'Quiero leer 20 min a las 22:00'). 🎯",
+    "¡Hola, {name}! Qué bueno saludarte. ¿Cómo va tu día? Recuerda que aquí estoy para apoyarte con tus metas.",
+    "¡Vamos con todo hoy, {name}! Cada pequeño paso diario cuenta. Si necesitas registrar un nuevo hábito o ver cómo vas, avísame.",
+    "¡Ey, {name}! Qué gusto leerte. Puedes ver tu avance en '📋 Mis Hábitos' o contarme qué nuevo hábito tienes en mente.",
+    "¡Esa es la actitud, {name}! Cuenta conmigo para mantener la constancia día a día.",
 ]
 
 
@@ -40,7 +40,7 @@ def _get_fallback_message(username: str, pending_habits: List[str], current_stre
 
 
 def _call_gemini_api(username: str, pending_habits: List[str], current_streak: int) -> str:
-    """Synchronous worker to call Gemini API for rescue alert."""
+    """Synchronous worker to call Gemini API for friendly rescue reminder."""
     from google import genai
 
     api_key = os.getenv("GEMINI_API_KEY")
@@ -50,12 +50,14 @@ def _call_gemini_api(username: str, pending_habits: List[str], current_streak: i
     client = genai.Client(api_key=api_key)
     habits_str = ", ".join(pending_habits)
     prompt = (
-        f"Actúa como un coach de hábitos dramático, divertido y persuasivo al estilo del búho de Duolingo.\n"
+        f"Actúa como un amigo cercano, comprensivo y motivador que acompaña a su compañero en la construcción de hábitos.\n"
         f"Nombre del usuario: {username}\n"
         f"Racha actual: {current_streak} días\n"
-        f"Hábitos que todavía NO ha completado hoy: {habits_str}\n\n"
-        "Genera un mensaje corto (máx 280 caracteres), persuasivo y divertido/dramático estilo Duolingo "
-        "para recordarle al usuario completar sus hábitos antes de que termine el día. "
+        f"Hábitos que todavía tiene pendientes hoy: {habits_str}\n\n"
+        "Genera un mensaje corto (máx 240 caracteres), cálido, auténtico y alentador. "
+        "Trátalo como a un par, de forma humana y cercana, dándole un empujoncito amigable para que no afloje "
+        "y complete sus hábitos antes de finalizar el día. "
+        "NO exageres con dramatismo ni amenazas, NO menciones búhos ni mascotas. "
         "Devuelve únicamente el texto del mensaje, sin comillas adicionales ni explicaciones."
     )
 
@@ -80,14 +82,14 @@ async def generate_rescue_message(
     pending_habits: List[str],
     current_streak: int,
 ) -> str:
-    """Generate a dramatic Duolingo-style rescue message using Gemini API."""
+    """Generate a friendly, warm reminder message using Gemini API."""
     if not pending_habits:
-        return f"🎉 ¡Increíble trabajo, {username}! No tienes hábitos pendientes por hoy."
+        return f"🎉 ¡Increíble trabajo, {username}! Ya completaste todos tus hábitos por hoy."
 
     try:
         return await asyncio.to_thread(_call_gemini_api, username, pending_habits, current_streak)
     except Exception as e:
-        logger.warning(f"Failed to generate rescue message via Gemini API ({e}). Using dramatic fallback.")
+        logger.warning(f"Failed to generate rescue message via Gemini API ({e}). Using friendly fallback.")
         return _get_fallback_message(username, pending_habits, current_streak)
 
 
@@ -182,7 +184,7 @@ def _call_gemini_intent_router(user_text: str) -> Dict[str, Any]:
 
     client = genai.Client(api_key=api_key)
     prompt = f"""
-Eres el clasificador de intenciones (Intent Router) y motor de NLP de HabitBot (Coach de hábitos estilo Duolingo).
+Eres el clasificador de intenciones (Intent Router) y motor de NLP de HabitBot, un asistente y compañero amigable de hábitos diarios.
 Analiza el mensaje del usuario y responde ESTRICTAMENTE con un objeto JSON válido con esta estructura:
 {{
   "intencion": "CREAR_HABITO" | "VER_REPORTE" | "VER_ESTADO" | "PROBAR_ALERTA" | "CONVERSACION_GENERAL",
@@ -198,17 +200,17 @@ Criterios de clasificación:
    Ejemplos: "¿cómo me fue esta semana?", "dame mi resumen", "métricas de la semana", "reporte semanal", "📊 Mi Semana", "estadísticas".
    (datos_habito debe tener todos sus campos en null).
 2. "VER_ESTADO": El usuario desea ver sus hábitos del día, progreso actual o racha.
-   Ejemplos: "mis hábitos", "qué tengo hoy", "cómo voy", "📋 Mis Hábitos", "ver racha", "tablero".
+   Ejemplos: "mis hábitos", "qué tengo hoy", "cómo voy", "📋 Mis Hábitos", "ver racha", "tablero", "mis metas".
    (datos_habito debe tener todos sus campos en null).
-3. "PROBAR_ALERTA": El usuario solicita explícitamente probar, testear o simular la alerta de rescate Duolingo.
-   Ejemplos: "probar alerta", "haz la alerta", "alerta duolingo", "⚡ Probar Alerta", "simular rescate".
+3. "PROBAR_ALERTA": El usuario solicita explícitamente probar, testear o simular la alerta o recordatorio de hábitos.
+   Ejemplos: "probar alerta", "haz la alerta", "recordatorio de prueba", "⚡ Probar Alerta", "simular recordatorio".
    (datos_habito debe tener todos sus campos en null).
 4. "CREAR_HABITO": El usuario expresa la intención de hacer, construir o agregar un hábito, rutina o meta personal.
    Ejemplos: "Quiero leer 20 min todas las noches a las 22:00", "Tomar 2L de agua", "Salir a correr interdiario", "Meditar 10 min a las 7am", "➕ Agregar Hábito".
-   - "titulo": Título limpio, conciso y en infinitivo (máx 50 caracteres). NO incluyas la hora en el título. (ej: "Leer 20 min", "Tomar 2L de agua").
+   - "titulo": Título limpio, conciso y en infinitivo (máx 50 caracteres). NO incluyas la hora en el título (ej: "Leer 20 min", "Tomar 2L de agua").
    - "frecuencia": "diario", "interdiario", "semanal" (por defecto "diario").
    - "hora": Hora en formato 24h "HH:MM" (ej: "22:00", "07:00"). Si no menciona hora, null.
-5. "CONVERSACION_GENERAL": Saludos casuales ("hola", "buenas"), bromas, agradecimientos ("gracias"), preguntas casuales ("quién eres") o charla general que no active ninguna de las acciones anteriores.
+5. "CONVERSACION_GENERAL": Saludos casuales ("hola", "buenas"), agradecimientos ("gracias"), preguntas sobre cómo funciona o charla general amigable que no active ninguna de las acciones anteriores.
    (datos_habito debe tener todos sus campos en null).
 
 Texto del usuario: "{user_text}"
@@ -298,14 +300,16 @@ def _call_gemini_weekly_feedback(username: str, streak: int, percentage: int, ha
 
     client = genai.Client(api_key=api_key)
     prompt = (
-        f"Actúa como un coach de hábitos motivacional, divertido y ligeramente sarcástico estilo Duolingo.\n"
+        f"Actúa como un amigo cercano, comprensivo y motivador que acompaña a su par en la construcción de hábitos.\n"
         f"Usuario: {username}\n"
         f"Racha actual: {streak} días\n"
         f"Efectividad de cumplimiento semanal: {percentage}%\n"
         f"Hábitos evaluados: {habits_summary}\n\n"
-        "Escribe un mensaje de retroalimentación semanal corto (máximo 280 caracteres). "
-        "Si el porcentaje es alto (>=80%), felicítalo con energía. Si es medio (50-79%), motívalo a no aflojar. "
-        "Si es bajo (<50%), usa el humor dramático del búho de Duolingo para exigirle que despierte la próxima semana. "
+        "Escribe un mensaje de retroalimentación semanal corto (máximo 260 caracteres), auténtico y cálido. "
+        "Si el porcentaje es alto (>=80%), felicítalo con alegría genuina y celebra su constancia. "
+        "Si es medio (50-79%), reconócele el esfuerzo y anímalo a ir por más la siguiente semana. "
+        "Si es bajo (<50%), sé empático, dile que una semana difícil le pasa a cualquiera y anímalo a retomar con calma el lunes. "
+        "NO uses tonos agresivos, ni dramatismo de búho, ni amenazas. "
         "Devuelve únicamente el texto directo, sin comillas ni explicaciones."
     )
 
@@ -338,15 +342,15 @@ async def generate_weekly_feedback(
     except Exception as e:
         logger.warning(f"Failed to generate weekly feedback with Gemini ({e}). Using fallback.")
         if percentage >= 80:
-            return f"🦉 ¡Impresionante semana, {username}! {percentage}% de efectividad. ¡Esa racha de {streak} días es imparable! 🔥🏆"
+            return f"¡Impresionante semana, {username}! Lograste un {percentage}% de efectividad y tu racha de {streak} días está más firme que nunca. ¡A seguir con ese ritmo! 🔥"
         elif percentage >= 50:
-            return f"🦉 ¡Buen esfuerzo, {username}! Lograste un {percentage}%, pero la próxima semana queremos el 100%. ¡A cuidar esa racha! ⚡"
+            return f"¡Buen trabajo esta semana, {username}! Cerraste con un {percentage}%. Estás construyendo el hábito; la próxima semana vamos por el 100% juntos."
         else:
-            return f"🦉 ¡Alerta, {username}! Solo un {percentage}% esta semana. El búho está llorando lágrimas de fuego. ¡La próxima semana renacemos! 😭🔥"
+            return f"Tranquilo, {username}, un {percentage}% significa que tuvimos días complicados, pero cada semana es un nuevo comienzo. ¡El lunes retomamos con fuerza!"
 
 
 def _call_gemini_coach_reply(username: str, user_text: str) -> str:
-    """Generate quick coach conversational reply."""
+    """Generate friendly conversational reply as a supportive companion."""
     from google import genai
 
     api_key = os.getenv("GEMINI_API_KEY")
@@ -355,11 +359,12 @@ def _call_gemini_coach_reply(username: str, user_text: str) -> str:
 
     client = genai.Client(api_key=api_key)
     prompt = (
-        f"Eres el búho coach de hábitos de HabitBot (estilo Duolingo: motivador, gracioso y un poco dramático con la disciplina).\n"
+        f"Eres el compañero y asistente de hábitos de HabitBot. Tu estilo es el de un AMIGO cercano, atento, comprensivo y motivador.\n"
         f"Usuario: {username}\n"
         f"Mensaje del usuario: \"{user_text}\"\n\n"
-        "Responde de forma muy concisa (máximo 160 caracteres). Invítalo con humor a revisar sus hábitos o registrar uno nuevo si lo desea. "
-        "Devuelve únicamente tu respuesta directa."
+        "Responde de forma concisa (máximo 160 caracteres), cercana y humana. Trátalo de igual a igual, con calidez. "
+        "Invítalo con naturalidad a revisar sus hábitos de hoy o registrar uno nuevo si lo necesita. "
+        "NO menciones búhos ni dramatismos. Devuelve únicamente tu respuesta directa."
     )
 
     for model_name in ["gemini-flash-lite-latest", "gemini-flash-latest"]:
@@ -378,7 +383,7 @@ def _call_gemini_coach_reply(username: str, user_text: str) -> str:
 
 
 async def generate_coach_reply(username: str, user_text: str) -> str:
-    """Generate conversational reply with Duolingo coach personality."""
+    """Generate conversational reply with friendly companion personality."""
     try:
         return await asyncio.to_thread(_call_gemini_coach_reply, username, user_text)
     except Exception:

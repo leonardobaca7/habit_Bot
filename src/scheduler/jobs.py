@@ -114,9 +114,9 @@ async def send_rescue_notification(bot: Bot, user: Dict[str, Any], force: bool =
 
     safe_ai_message = html.escape(ai_message)
     full_message = (
-        "🚨 <b>¡ALERTA DE RACHA!</b> 🔥\n\n"
+        "⏰ <b>¡Recordatorio de Racha!</b> 🔥\n\n"
         f"{safe_ai_message}\n\n"
-        "👇 <i>Toca para salvarla ahora mismo:</i>"
+        "👇 <i>Toca para marcar tu avance de hoy:</i>"
     )
     keyboard = build_status_keyboard(habits)
 
@@ -227,8 +227,8 @@ async def send_weekly_report(bot: Bot, user: Dict[str, Any], force: bool = False
     emoji = get_streak_emoji(streak)
 
     lines = [
-        "📊 <b>¡Reporte Semanal de Hábitos!</b> 🦉\n",
-        f"👤 <b>Atleta de la disciplina:</b> {safe_name}",
+        "📊 <b>¡Reporte Semanal de Hábitos!</b>\n",
+        f"👤 <b>Atleta de la constancia:</b> {safe_name}",
         f"📅 <b>Periodo:</b> {stats['start_date']} al {stats['end_date']}",
         f"🔥 <b>Racha actual:</b> {streak} días {emoji}",
         f"🎯 <b>Cumplimiento esta semana:</b> {pct}% ({stats['completed_count']}/{stats['total_expected']} check-ins)\n",
@@ -240,7 +240,7 @@ async def send_weekly_report(bot: Bot, user: Dict[str, Any], force: bool = False
         bar = "🟩" * days + "⬜" * (7 - days)
         lines.append(f"• <b>{html.escape(h['title'])}</b>: {days}/7 días\n  [{bar}]")
 
-    lines.append(f"\n💬 <b>Palabras de tu Coach:</b>\n<i>\"{safe_feedback}\"</i>")
+    lines.append(f"\n💬 <b>Comentario de tu Compañero:</b>\n<i>\"{safe_feedback}\"</i>")
 
     full_message = "\n".join(lines)
     keyboard = InlineKeyboardMarkup([

@@ -58,18 +58,18 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     first_name = html.escape(user.first_name or "Amigo")
     welcome_text = (
-        f"🦉 <b>¡Hola, {first_name}! Bienvenido a HabitBot.</b>\n\n"
-        "Soy tu coach diario de hábitos. Mi misión es ayudarte "
-        "a construir disciplina paso a paso y mantener viva tu racha 🔥.\n\n"
+        f"👋 <b>¡Hola, {first_name}! Bienvenido a HabitBot.</b>\n\n"
+        "Soy tu compañero de hábitos diarios. Mi meta es acompañarte "
+        "a construir constancia paso a paso y mantener viva tu racha 🔥.\n\n"
         "💡 <b>¡Ya no dependes de comandos!</b>\n"
         "Puedes usar los botones de acceso rápido que aparecen abajo o simplemente "
         "<b>escribir en el chat lo que deseas hacer</b> (por ejemplo: <i>'Quiero leer 20 min'</i> o <i>'Tomar 2L de agua'</i>) "
-        "y mi Inteligencia Artificial lo registrará automáticamente. 🤖✨\n\n"
+        "y mi Inteligencia Artificial lo registrará automáticamente. ✨\n\n"
         "🔘 <b>Botones principales:</b>\n"
         "• <b>📋 Mis Hábitos:</b> Tu tablero interactivo diario con casillas.\n"
         "• <b>📊 Mi Semana:</b> Reporte semanal y estadísticas de cumplimiento.\n"
         "• <b>➕ Agregar Hábito:</b> Guía para crear nuevas metas con IA.\n"
-        "• <b>⚡ Probar Alerta:</b> Simula la alerta de rescate de racha."
+        "• <b>⚡ Probar Alerta:</b> Simula el recordatorio amigable de racha."
     )
 
     await update.message.reply_text(
@@ -346,12 +346,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     help_text = (
-        "🦉 <b>Guía de HabitBot: Coach de Hábitos</b>\n\n"
-        "HabitBot se basa en la consistencia de pequeñas acciones diarias para generar grandes cambios.\n\n"
+        "📘 <b>Guía de HabitBot: Tu Compañero de Hábitos</b>\n\n"
+        "HabitBot se basa en la constancia de pequeñas acciones diarias para generar grandes cambios.\n\n"
         "🔥 <b>Reglas de la Racha:</b>\n"
         "1. Completa <b>todos</b> tus hábitos registrados antes de la medianoche.\n"
         "2. Al completar el último hábito, tu racha aumentará en +1 día.\n"
-        "3. Si un día no completas tus hábitos, tu racha volverá a 0. ¡No dejes que se apague el fuego!\n\n"
+        "3. Si un día no completas tus hábitos, tu racha volverá a 0. ¡Mantengamos ese fuego encendido!\n\n"
         "📌 <b>Lista de Comandos:</b>\n"
         "• <code>/start</code> — Inicia o reinicia tu perfil.\n"
         "• <code>/add_habit &lt;nombre&gt;</code> — Agrega un hábito diario.\n"
@@ -399,7 +399,7 @@ async def test_duolingo_command(update: Update, context: ContextTypes.DEFAULT_TY
     if not sent:
         await update.message.reply_text(
             "🌟 ¡No tienes hábitos pendientes para hoy o no tienes hábitos registrados!\n\n"
-            "Para probar la alerta de rescate de racha, asegúrate de tener al menos un hábito sin completar.",
+            "Para probar el recordatorio amigable de racha, asegúrate de tener al menos un hábito sin completar.",
             parse_mode=ParseMode.HTML,
         )
 
@@ -500,7 +500,7 @@ async def process_text_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if not sent:
             await update.message.reply_text(
                 "🌟 ¡No tienes hábitos pendientes para hoy o no tienes hábitos registrados!\n\n"
-                "Para probar la alerta de rescate de racha, asegúrate de tener al menos un hábito sin completar.",
+                "Para probar el recordatorio amigable de racha, asegúrate de tener al menos un hábito sin completar.",
                 reply_markup=get_main_reply_keyboard(),
                 parse_mode=ParseMode.HTML,
             )
