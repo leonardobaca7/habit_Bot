@@ -19,6 +19,8 @@ from src.bot.handlers import (
     help_command,
     test_morning_command,
     test_rescue_command,
+    test_duolingo_command,
+    test_weekly_command,
     process_text_message,
     text_message_handler,
     button_callback_handler,
@@ -69,6 +71,8 @@ def create_application() -> Application:
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("test_morning", test_morning_command))
     app.add_handler(CommandHandler("test_rescue", test_rescue_command))
+    app.add_handler(CommandHandler("test_duolingo", test_duolingo_command))
+    app.add_handler(CommandHandler("test_weekly", test_weekly_command))
 
     # Register Message Handler for Natural Language Habit Processing and Buttons
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_text_message))

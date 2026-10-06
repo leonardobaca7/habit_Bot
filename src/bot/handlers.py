@@ -27,8 +27,17 @@ from src.core.habits import (
     get_main_reply_keyboard,
     format_streak_card,
 )
-from src.scheduler.jobs import send_morning_notification, send_rescue_notification
-from src.services.ai_service import extract_habit_from_text, parse_habit_intent
+from src.scheduler.jobs import (
+    send_morning_notification,
+    send_rescue_notification,
+    send_weekly_report,
+)
+from src.services.ai_service import (
+    extract_habit_from_text,
+    parse_habit_intent,
+    classify_and_parse_intent,
+    generate_coach_reply,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +66,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "<b>escribir en el chat lo que deseas hacer</b> (por ejemplo: <i>'Quiero leer 20 min'</i> o <i>'Tomar 2L de agua'</i>) "
         "y mi Inteligencia Artificial lo registrará automáticamente. 🤖✨\n\n"
         "🔘 <b>Botones principales:</b>\n"
-        "• <b>📋 Mis Hábitos de Hoy:</b> Tu tablero interactivo con casillas.\n"
-        "• <b>➕ Agregar Hábito:</b> Ideas y guía para crear nuevas metas.\n"
-        "• <b>🔥 Ver Racha:</b> Consulta tus días consecutivos y estadísticas."
+        "• <b>📋 Mis Hábitos:</b> Tu tablero interactivo diario con casillas.\n"
+        "• <b>📊 Mi Semana:</b> Reporte semanal y estadísticas de cumplimiento.\n"
+        "• <b>➕ Agregar Hábito:</b> Guía para crear nuevas metas con IA.\n"
+        "• <b>⚡ Probar Alerta:</b> Simula la alerta de rescate de racha."
     )
 
     await update.message.reply_text(
@@ -371,8 +381,11 @@ async def test_morning_command(update: Update, context: ContextTypes.DEFAULT_TYP
         )
 
 
-async def test_rescue_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Manual trigger to test Gemini rescue notification immediately."""
+async def test_duolingo_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Manual trigger to force Gemini Duolingo rescue alert immediately.
+    Generates AI push reminder with interactive buttons without waiting 6.5h.
+    """
     user = update.effective_user
     if not user or not update.message:
         return
@@ -385,17 +398,47 @@ async def test_rescue_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     sent = await send_rescue_notification(context.bot, db_user, force=True)
     if not sent:
         await update.message.reply_text(
-            "🌟 ¡No tienes hábitos pendientes para hoy o no tienes hábitos registrados! "
-            "Para probar la alerta de rescate, asegúrate de tener al menos un hábito sin completar.",
+            "🌟 ¡No tienes hábitos pendientes para hoy o no tienes hábitos registrados!\n\n"
+            "Para probar la alerta de rescate de racha, asegúrate de tener al menos un hábito sin completar.",
+            parse_mode=ParseMode.HTML,
+        )
+
+
+# Backward compatibility alias
+test_rescue_command = test_duolingo_command
+
+
+async def test_weekly_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Manual trigger to force weekly report immediately.
+    Calculates 7-day SQLite completion statistics and generates Gemini feedback.
+    """
+    user = update.effective_user
+    if not user or not update.message:
+        return
+
+    db_user = await get_user(user.id)
+    if not db_user:
+        await update.message.reply_text("Primero usa /start para registrarte.")
+        return
+
+    sent = await send_weekly_report(context.bot, db_user, force=True)
+    if not sent:
+        await update.message.reply_text(
+            "⚠️ No se pudo generar el reporte semanal. Asegúrate de tener al menos un hábito registrado con /add_habit.",
             parse_mode=ParseMode.HTML,
         )
 
 
 async def process_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Handle incoming text messages:
-    - Button clicks ('📋 Mis Hábitos de Hoy', '➕ Agregar Hábito', '🔥 Ver Racha')
-    - Natural language free-form text parsed strictly with Gemini NLP JSON parser.
+    Central AI Intent Router and Message Handler.
+    Intercepts all incoming text messages, classifies user intention via Gemini API NLP:
+    - VER_REPORTE: Weekly statistics calculation and personalized Gemini feedback
+    - VER_ESTADO: Daily checklist board with interactive check/uncheck buttons
+    - PROBAR_ALERTA: Immediate Duolingo rescue notification trigger
+    - CREAR_HABITO: Automatic habit title, frequency and time extraction & registration
+    - CONVERSACION_GENERAL: Sarcastic/motivational Duolingo coach response
     """
     user = update.effective_user
     if not user or not update.message:
@@ -408,12 +451,7 @@ async def process_text_message(update: Update, context: ContextTypes.DEFAULT_TYP
     # Ensure user is registered
     db_user = await add_or_update_user(user.id, user.username)
 
-    # 1. Button: "📋 Mis Hábitos de Hoy"
-    if text == "📋 Mis Hábitos de Hoy":
-        await status_command(update, context)
-        return
-
-    # 2. Button: "➕ Agregar Hábito"
+    # 1. Quick helper button: "➕ Agregar Hábito"
     if text == "➕ Agregar Hábito":
         prompt_text = (
             "✏️ <b>¿Qué nuevo hábito te gustaría construir?</b>\n\n"
@@ -424,39 +462,69 @@ async def process_text_message(update: Update, context: ContextTypes.DEFAULT_TYP
             "• <i>Hacer 30 flexiones al despertar</i>\n\n"
             "🤖 <b>Nuestra IA con Gemini</b> extraerá el título, frecuencia y hora automáticamente."
         )
-        await update.message.reply_text(prompt_text, parse_mode=ParseMode.HTML)
-        return
-
-    # 3. Button: "🔥 Ver Racha"
-    if text == "🔥 Ver Racha":
-        tz = db_user.get("timezone", "UTC") if db_user else "UTC"
-        streak = db_user.get("streak_count", 0) if db_user else 0
-        last_date = db_user.get("last_completed_date") if db_user else None
-        today_str = get_user_today_str(tz)
-        habits = await get_today_habits_status(user.id, today_str)
-
-        card = format_streak_card(
-            username=user.first_name or user.username or "Campeón",
-            streak=streak,
-            last_completed_date=last_date or "Sin registro aún",
-            habits=habits,
+        await update.message.reply_text(
+            prompt_text,
+            reply_markup=get_main_reply_keyboard(),
+            parse_mode=ParseMode.HTML,
         )
-        keyboard = build_status_keyboard(habits) if habits else None
-        await update.message.reply_text(card, reply_markup=keyboard, parse_mode=ParseMode.HTML)
         return
 
-    # 4. Natural language habit intent analysis via Gemini API
+    # Send typing action to Telegram
     await update.message.chat.send_action("typing")
 
-    intent = await parse_habit_intent(text)
-    if intent.get("es_habito") and intent.get("titulo"):
-        title = intent["titulo"]
+    # 2. AI Intent Router with Gemini
+    intent_data = await classify_and_parse_intent(text)
+    intent = intent_data.get("intencion", "CONVERSACION_GENERAL")
+    logger.info(f"User {user.id} message: '{text}' -> Intent: {intent}")
+
+    # Case A: VER_REPORTE
+    if intent == "VER_REPORTE":
+        sent = await send_weekly_report(context.bot, db_user, force=True)
+        if not sent:
+            await update.message.reply_text(
+                "🌱 <b>No tienes hábitos activos</b> para generar el reporte semanal.\n\n"
+                "¡Agrega tu primer hábito escribiéndolo o con <b>➕ Agregar Hábito</b>!",
+                reply_markup=get_main_reply_keyboard(),
+                parse_mode=ParseMode.HTML,
+            )
+        return
+
+    # Case B: VER_ESTADO
+    elif intent == "VER_ESTADO":
+        await status_command(update, context)
+        return
+
+    # Case C: PROBAR_ALERTA
+    elif intent == "PROBAR_ALERTA":
+        sent = await send_rescue_notification(context.bot, db_user, force=True)
+        if not sent:
+            await update.message.reply_text(
+                "🌟 ¡No tienes hábitos pendientes para hoy o no tienes hábitos registrados!\n\n"
+                "Para probar la alerta de rescate de racha, asegúrate de tener al menos un hábito sin completar.",
+                reply_markup=get_main_reply_keyboard(),
+                parse_mode=ParseMode.HTML,
+            )
+        return
+
+    # Case D: CREAR_HABITO
+    elif intent == "CREAR_HABITO":
+        datos = intent_data.get("datos_habito", {})
+        title = (datos.get("titulo") or "").strip()
+
+        if not title or len(title) < 2:
+            reply = await generate_coach_reply(user.first_name or user.username or "Amigo", text)
+            await update.message.reply_text(
+                html.escape(reply),
+                reply_markup=get_main_reply_keyboard(),
+                parse_mode=ParseMode.HTML,
+            )
+            return
+
         if len(title) > 100:
             title = title[:100]
 
-        frequency = intent.get("frecuencia", "diario")
-        time = intent.get("hora")
-        # Si hora es null, asigna la hora mañanera por defecto del usuario
+        frequency = datos.get("frecuencia") or "diario"
+        time = datos.get("hora")
         if not time:
             time = db_user.get("morning_hour", "08:00") or "08:00"
 
@@ -485,21 +553,14 @@ async def process_text_message(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return
 
-    # 5. Si es_habito es false: respuesta amigable con tono Duolingo
-    not_understood_text = (
-        "🦉 <i>¡Ups! No estoy seguro de si eso es un hábito.</i>\n\n"
-        "Prueba diciendo algo como:\n"
-        "• <i>\"Leer 20 minutos todas las noches a las 22:00\"</i>\n"
-        "• <i>\"Tomar 2L de agua\"</i>\n"
-        "• <i>\"Meditar 10 minutos a las 07:30\"</i>\n"
-        "• <i>\"Hacer 30 flexiones al despertar\"</i>\n\n"
-        "O usa los botones de abajo para navegar. 👇"
-    )
-    await update.message.reply_text(
-        not_understood_text,
-        reply_markup=get_main_reply_keyboard(),
-        parse_mode=ParseMode.HTML,
-    )
+    # Case E: CONVERSACION_GENERAL (Default)
+    else:
+        reply = await generate_coach_reply(user.first_name or user.username or "Amigo", text)
+        await update.message.reply_text(
+            html.escape(reply),
+            reply_markup=get_main_reply_keyboard(),
+            parse_mode=ParseMode.HTML,
+        )
 
 
 # Alias for compatibility

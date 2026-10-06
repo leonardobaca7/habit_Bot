@@ -293,3 +293,53 @@ async def record_notification_sent(
         )
         await db.commit()
 
+
+async def get_weekly_statistics(
+    user_id: int,
+    end_date_str: str,
+    db_path: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Calculate 7-day habit completion stats ending on end_date_str.
+    Returns completed counts, total expected, percentage, and habit breakdown.
+    """
+    end_dt = datetime.strptime(end_date_str, "%Y-%m-%d")
+    start_dt = end_dt - timedelta(days=6)
+    start_date_str = start_dt.strftime("%Y-%m-%d")
+
+    async with get_db_connection(db_path) as db:
+        async with db.execute(
+            """
+            SELECT 
+                h.id,
+                h.title,
+                COUNT(CASE WHEN l.completed = 1 THEN 1 END) AS completed_days
+            FROM habits h
+            LEFT JOIN daily_logs l 
+                ON l.habit_id = h.id 
+                AND l.date >= ? 
+                AND l.date <= ?
+            WHERE h.user_id = ?
+            GROUP BY h.id, h.title;
+            """,
+            (start_date_str, end_date_str, user_id),
+        ) as cursor:
+            rows = await cursor.fetchall()
+            habit_breakdown = [dict(r) for r in rows]
+
+    total_habits = len(habit_breakdown)
+    completed_count = sum(r["completed_days"] for r in habit_breakdown)
+    total_expected = total_habits * 7
+    percentage = int((completed_count / total_expected) * 100) if total_expected > 0 else 0
+
+    return {
+        "start_date": start_date_str,
+        "end_date": end_date_str,
+        "total_habits": total_habits,
+        "completed_count": completed_count,
+        "total_expected": total_expected,
+        "percentage": percentage,
+        "habit_breakdown": habit_breakdown,
+    }
+
+

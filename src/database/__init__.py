@@ -14,6 +14,7 @@ from .queries import (
     get_all_users,
     has_notification_been_sent,
     record_notification_sent,
+    get_weekly_statistics,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "get_all_users",
     "has_notification_been_sent",
     "record_notification_sent",
+    "get_weekly_statistics",
 ]

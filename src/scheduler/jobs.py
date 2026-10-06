@@ -16,10 +16,11 @@ from src.database.queries import (
     get_today_habits_status,
     has_notification_been_sent,
     record_notification_sent,
+    get_weekly_statistics,
 )
 from src.core.streaks import get_user_today_str, get_streak_emoji
 from src.core.habits import format_status_message, build_status_keyboard
-from src.services.ai_service import generate_rescue_message
+from src.services.ai_service import generate_rescue_message, generate_weekly_feedback
 
 logger = logging.getLogger(__name__)
 
@@ -175,10 +176,98 @@ async def send_habit_custom_notification(bot: Bot, user: Dict[str, Any], habit: 
         return False
 
 
+async def send_weekly_report(bot: Bot, user: Dict[str, Any], force: bool = False) -> bool:
+    """
+    Generate and send the 7-day habit completion weekly report.
+    Scheduled for Sundays at 20:00 (local user time) or triggered via /test_weekly.
+    """
+    user_id = user["id"]
+    tz = user.get("timezone", "UTC")
+    today_str = get_user_today_str(tz)
+
+    if not force and await has_notification_been_sent(user_id, today_str, "weekly_report"):
+        return False
+
+    stats = await get_weekly_statistics(user_id, today_str)
+    if stats["total_habits"] == 0:
+        if force:
+            try:
+                await bot.send_message(
+                    chat_id=user_id,
+                    text=(
+                        "🌱 <b>No tienes hábitos activos</b> para evaluar en tu reporte semanal.\n\n"
+                        "¡Agrega tu primer hábito escribiéndolo o con <b>➕ Agregar Hábito</b>!"
+                    ),
+                    parse_mode=ParseMode.HTML,
+                )
+            except TelegramError as e:
+                logger.error(f"Error sending empty weekly report to user {user_id}: {e}")
+        return False
+
+    name = user.get("username") or "Campeón"
+    streak = user.get("streak_count", 0)
+    pct = stats["percentage"]
+
+    # Habit summary string for AI feedback
+    habits_summary = ", ".join([
+        f"{h['title']} ({h['completed_days']}/7 días)"
+        for h in stats["habit_breakdown"]
+    ])
+
+    # Generate motivational/Duolingo feedback with Gemini API
+    ai_feedback = await generate_weekly_feedback(
+        username=name,
+        streak=streak,
+        percentage=pct,
+        habits_summary=habits_summary,
+    )
+
+    safe_name = html.escape(name)
+    safe_feedback = html.escape(ai_feedback)
+    emoji = get_streak_emoji(streak)
+
+    lines = [
+        "📊 <b>¡Reporte Semanal de Hábitos!</b> 🦉\n",
+        f"👤 <b>Atleta de la disciplina:</b> {safe_name}",
+        f"📅 <b>Periodo:</b> {stats['start_date']} al {stats['end_date']}",
+        f"🔥 <b>Racha actual:</b> {streak} días {emoji}",
+        f"🎯 <b>Cumplimiento esta semana:</b> {pct}% ({stats['completed_count']}/{stats['total_expected']} check-ins)\n",
+        "📋 <b>Desglose por hábito:</b>",
+    ]
+
+    for h in stats["habit_breakdown"]:
+        days = h["completed_days"]
+        bar = "🟩" * days + "⬜" * (7 - days)
+        lines.append(f"• <b>{html.escape(h['title'])}</b>: {days}/7 días\n  [{bar}]")
+
+    lines.append(f"\n💬 <b>Palabras de tu Coach:</b>\n<i>\"{safe_feedback}\"</i>")
+
+    full_message = "\n".join(lines)
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📊 Ver Tablero de Hoy", callback_data="status_refresh")]
+    ])
+
+    try:
+        await bot.send_message(
+            chat_id=user_id,
+            text=full_message,
+            reply_markup=keyboard,
+            parse_mode=ParseMode.HTML,
+        )
+        if not force:
+            await record_notification_sent(user_id, today_str, "weekly_report")
+        logger.info(f"Weekly report successfully sent to user {user_id}")
+        return True
+    except TelegramError as e:
+        logger.error(f"Failed to send weekly report to user {user_id}: {e}")
+        return False
+
+
 async def dispatch_scheduled_notifications(bot: Bot) -> None:
     """
     Periodic job to inspect users and dispatch morning & rescue notifications
-    at their respective configured hours, plus custom habit notifications.
+    at their respective configured hours, custom habit notifications,
+    and Sunday weekly reports.
     """
     try:
         users = await get_all_users()
@@ -207,6 +296,10 @@ async def dispatch_scheduled_notifications(bot: Bot) -> None:
             for h in habits:
                 if h.get("time") and h["time"] == current_hm:
                     await send_habit_custom_notification(bot, user, h)
+
+            # 4. Check Weekly Report (Sundays at 20:00)
+            if now_user.weekday() == 6 and current_hm == "20:00":
+                await send_weekly_report(bot, user, force=False)
 
     except Exception as e:
         logger.error(f"Error in notification dispatcher: {e}", exc_info=True)

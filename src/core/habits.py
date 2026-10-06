@@ -99,8 +99,8 @@ def build_habits_list_keyboard(habits: List[Dict[str, Any]]) -> InlineKeyboardMa
 def get_main_reply_keyboard() -> ReplyKeyboardMarkup:
     """Return persistent reply keyboard with main action buttons."""
     keyboard = [
-        [KeyboardButton("📋 Mis Hábitos de Hoy")],
-        [KeyboardButton("➕ Agregar Hábito"), KeyboardButton("🔥 Ver Racha")],
+        [KeyboardButton("📋 Mis Hábitos"), KeyboardButton("📊 Mi Semana")],
+        [KeyboardButton("➕ Agregar Hábito"), KeyboardButton("⚡ Probar Alerta")],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True)
 

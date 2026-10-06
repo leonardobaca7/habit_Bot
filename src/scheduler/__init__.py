@@ -3,6 +3,7 @@ from .jobs import (
     setup_scheduler,
     send_morning_notification,
     send_rescue_notification,
+    send_weekly_report,
     calculate_rescue_hour,
     dispatch_scheduled_notifications,
 )
@@ -11,6 +12,7 @@ __all__ = [
     "setup_scheduler",
     "send_morning_notification",
     "send_rescue_notification",
+    "send_weekly_report",
     "calculate_rescue_hour",
     "dispatch_scheduled_notifications",
 ]
