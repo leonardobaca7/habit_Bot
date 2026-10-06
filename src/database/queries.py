@@ -215,3 +215,49 @@ async def check_and_update_streak(
 
     logger.info(f"User {user_id} completed all habits! Streak updated to {new_streak}.")
     return True, new_streak, True
+
+
+async def get_all_users(db_path: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Retrieve all registered users."""
+    async with get_db_connection(db_path) as db:
+        async with db.execute("SELECT * FROM users ORDER BY id ASC;") as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+
+async def has_notification_been_sent(
+    user_id: int,
+    date_str: str,
+    notif_type: str,
+    db_path: Optional[str] = None,
+) -> bool:
+    """Check if a notification of a given type was already sent to the user on date_str."""
+    async with get_db_connection(db_path) as db:
+        async with db.execute(
+            """
+            SELECT 1 FROM notification_logs 
+            WHERE user_id = ? AND date = ? AND notif_type = ?;
+            """,
+            (user_id, date_str, notif_type),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row is not None
+
+
+async def record_notification_sent(
+    user_id: int,
+    date_str: str,
+    notif_type: str,
+    db_path: Optional[str] = None,
+) -> None:
+    """Record that a notification was sent to prevent duplicates."""
+    async with get_db_connection(db_path) as db:
+        await db.execute(
+            """
+            INSERT OR IGNORE INTO notification_logs (user_id, date, notif_type)
+            VALUES (?, ?, ?);
+            """,
+            (user_id, date_str, notif_type),
+        )
+        await db.commit()
+

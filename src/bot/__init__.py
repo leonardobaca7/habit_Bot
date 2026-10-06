@@ -5,6 +5,8 @@ from .handlers import (
     list_command,
     status_command,
     help_command,
+    test_morning_command,
+    test_rescue_command,
     button_callback_handler,
 )
 
@@ -14,5 +16,7 @@ __all__ = [
     "list_command",
     "status_command",
     "help_command",
+    "test_morning_command",
+    "test_rescue_command",
     "button_callback_handler",
 ]

@@ -48,10 +48,23 @@ CREATE TABLE IF NOT EXISTS daily_logs (
 );
 """
 
+CREATE_NOTIFICATION_LOGS_TABLE = """
+CREATE TABLE IF NOT EXISTS notification_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    notif_type TEXT NOT NULL,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    UNIQUE(user_id, date, notif_type)
+);
+"""
+
 CREATE_INDEXES = """
 CREATE INDEX IF NOT EXISTS idx_habits_user_id ON habits(user_id);
 CREATE INDEX IF NOT EXISTS idx_daily_logs_user_date ON daily_logs(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_daily_logs_habit_date ON daily_logs(habit_id, date);
+CREATE INDEX IF NOT EXISTS idx_notif_logs ON notification_logs(user_id, date, notif_type);
 """
 
 
@@ -88,6 +101,7 @@ async def init_db(db_path: Optional[str] = None) -> None:
         await db.execute(CREATE_USERS_TABLE)
         await db.execute(CREATE_HABITS_TABLE)
         await db.execute(CREATE_DAILY_LOGS_TABLE)
+        await db.execute(CREATE_NOTIFICATION_LOGS_TABLE)
         await db.executescript(CREATE_INDEXES)
         await db.commit()
 

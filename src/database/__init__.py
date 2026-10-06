@@ -9,6 +9,9 @@ from .queries import (
     get_today_habits_status,
     toggle_habit_log,
     check_and_update_streak,
+    get_all_users,
+    has_notification_been_sent,
+    record_notification_sent,
 )
 
 __all__ = [
@@ -22,4 +25,7 @@ __all__ = [
     "get_today_habits_status",
     "toggle_habit_log",
     "check_and_update_streak",
+    "get_all_users",
+    "has_notification_been_sent",
+    "record_notification_sent",
 ]

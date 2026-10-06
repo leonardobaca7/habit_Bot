@@ -15,8 +15,11 @@ from src.bot.handlers import (
     list_command,
     status_command,
     help_command,
+    test_morning_command,
+    test_rescue_command,
     button_callback_handler,
 )
+from src.scheduler.jobs import setup_scheduler
 
 # Load environment variables from .env
 load_dotenv()
@@ -37,7 +40,7 @@ async def post_init(application: Application) -> None:
 
 
 def create_application() -> Application:
-    """Build and configure the Telegram Bot Application."""
+    """Build and configure the Telegram Bot Application and Scheduler."""
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token or token.strip() == "":
         logger.error(
@@ -46,7 +49,7 @@ def create_application() -> Application:
         )
         sys.exit(1)
 
-    # Initialize Application
+    # Initialize Application with APScheduler-backed JobQueue
     app = (
         Application.builder()
         .token(token.strip())
@@ -60,18 +63,23 @@ def create_application() -> Application:
     app.add_handler(CommandHandler("list", list_command))
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("test_morning", test_morning_command))
+    app.add_handler(CommandHandler("test_rescue", test_rescue_command))
 
     # Register Callback Query Handler for Interactive Buttons
     app.add_handler(CallbackQueryHandler(button_callback_handler))
+
+    # Setup APScheduler Background Dispatcher
+    setup_scheduler(app)
 
     return app
 
 
 def main() -> None:
     """Main entry point for HabitBot."""
-    logger.info("Starting HabitBot (Duolingo Style Habit Coach)...")
+    logger.info("Starting HabitBot with Gemini AI & APScheduler...")
     app = create_application()
-    logger.info("HabitBot handlers registered. Starting polling...")
+    logger.info("HabitBot handlers and scheduler registered. Starting polling...")
     app.run_polling()
 
 

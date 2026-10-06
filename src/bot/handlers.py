@@ -23,6 +23,7 @@ from src.core.habits import (
     format_habits_list,
     build_habits_list_keyboard,
 )
+from src.scheduler.jobs import send_morning_notification, send_rescue_notification
 
 logger = logging.getLogger(__name__)
 
@@ -274,3 +275,43 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "• <code>/help</code> — Muestra esta ayuda.\n"
     )
     await update.message.reply_text(help_text, parse_mode=ParseMode.HTML)
+
+
+async def test_morning_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Manual trigger to test morning notification immediately."""
+    user = update.effective_user
+    if not user or not update.message:
+        return
+
+    db_user = await get_user(user.id)
+    if not db_user:
+        await update.message.reply_text("Primero usa /start para registrarte.")
+        return
+
+    sent = await send_morning_notification(context.bot, db_user, force=True)
+    if not sent:
+        await update.message.reply_text(
+            "⚠️ No tienes hábitos configurados. Agrega uno con <code>/add_habit &lt;nombre&gt;</code>.",
+            parse_mode=ParseMode.HTML,
+        )
+
+
+async def test_rescue_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Manual trigger to test Gemini rescue notification immediately."""
+    user = update.effective_user
+    if not user or not update.message:
+        return
+
+    db_user = await get_user(user.id)
+    if not db_user:
+        await update.message.reply_text("Primero usa /start para registrarte.")
+        return
+
+    sent = await send_rescue_notification(context.bot, db_user, force=True)
+    if not sent:
+        await update.message.reply_text(
+            "🌟 ¡No tienes hábitos pendientes para hoy o no tienes hábitos registrados! "
+            "Para probar la alerta de rescate, asegúrate de tener al menos un hábito sin completar.",
+            parse_mode=ParseMode.HTML,
+        )
+
