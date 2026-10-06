@@ -45,5 +45,5 @@ def get_congratulations_message(streak: int) -> str:
     else:
         return (
             f"🎉 <b>¡Todos los hábitos de hoy completados! {emoji}</b>\n\n"
-            f"Tu racha asciende a <b>{streak} días</b> consecutivos. ¡Duolingo estaría orgulloso de ti! 🦉🔥"
+            f"Tu racha asciende a <b>{streak} días</b> consecutivos. ¡Sigue con esa constancia! 🦉🔥"
         )

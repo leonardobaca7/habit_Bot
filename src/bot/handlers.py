@@ -44,7 +44,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     first_name = html.escape(user.first_name or "Amigo")
     welcome_text = (
         f"🦉 <b>¡Hola, {first_name}! Bienvenido a HabitBot.</b>\n\n"
-        "Soy tu coach diario de hábitos al estilo Duolingo. Mi misión es ayudarte "
+        "Soy tu coach diario de hábitos. Mi misión es ayudarte "
         "a construir disciplina paso a paso y mantener viva tu racha 🔥.\n\n"
         "📋 <b>Comandos disponibles:</b>\n"
         "• <code>/add_habit &lt;nombre&gt;</code> — Crea un nuevo hábito diario.\n"
@@ -262,7 +262,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     help_text = (
         "🦉 <b>Guía de HabitBot: Coach de Hábitos</b>\n\n"
         "HabitBot se basa en la consistencia de pequeñas acciones diarias para generar grandes cambios.\n\n"
-        "🔥 <b>Reglas de la Racha (Duolingo Style):</b>\n"
+        "🔥 <b>Reglas de la Racha:</b>\n"
         "1. Completa <b>todos</b> tus hábitos registrados antes de la medianoche.\n"
         "2. Al completar el último hábito, tu racha aumentará en +1 día.\n"
         "3. Si un día no completas tus hábitos, tu racha volverá a 0. ¡No dejes que se apague el fuego!\n\n"
