@@ -35,7 +35,42 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
-logger = logging.getLogger("habitbot")
+import asyncio
+
+async def start_health_check_server() -> None:
+    """Start lightweight HTTP server for cloud platforms (Render, Koyeb) if PORT is set."""
+    port_str = os.getenv("PORT")
+    if not port_str:
+        return
+
+    try:
+        port = int(port_str)
+    except ValueError:
+        return
+
+    async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        try:
+            await reader.read(1024)
+            response = (
+                b"HTTP/1.1 200 OK\r\n"
+                b"Content-Type: text/plain; charset=utf-8\r\n"
+                b"Content-Length: 15\r\n"
+                b"Connection: close\r\n\r\n"
+                b"HabitBot Online"
+            )
+            writer.write(response)
+            await writer.drain()
+        except Exception:
+            pass
+        finally:
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+
+    server = await asyncio.start_server(handle_client, "0.0.0.0", port)
+    logger.info(f"Health check HTTP server running on port {port}")
 
 
 async def post_init(application: Application) -> None:
@@ -43,6 +78,7 @@ async def post_init(application: Application) -> None:
     logger.info("Initializing SQLite database...")
     await init_db()
     logger.info("Database initialized successfully.")
+    await start_health_check_server()
 
 
 def create_application() -> Application:
