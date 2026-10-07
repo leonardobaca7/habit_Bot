@@ -78,9 +78,13 @@ def get_db_path(db_path: Optional[str] = None) -> str:
 async def get_db_connection(db_path: Optional[str] = None) -> AsyncGenerator[aiosqlite.Connection, None]:
     """
     Async context manager for SQLite database connection.
-    Enables foreign keys and sets Row factory.
+    Enables foreign keys, ensures directory exists, and sets Row factory.
     """
     target_path = get_db_path(db_path)
+    parent_dir = os.path.dirname(target_path)
+    if parent_dir and not os.path.exists(parent_dir):
+        os.makedirs(parent_dir, exist_ok=True)
+
     db = await aiosqlite.connect(target_path)
     db.row_factory = aiosqlite.Row
     await db.execute("PRAGMA foreign_keys = ON;")
