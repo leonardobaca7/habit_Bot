@@ -35,6 +35,8 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
+logger = logging.getLogger("habitbot")
+
 import asyncio
 
 async def start_health_check_server() -> None:
